@@ -7,6 +7,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#14110F">
   <title>Movie Streaming Update</title>
+
+  <!-- Installable app (Stage 4). The manifest describes the app to Android
+       and desktop browsers. Paths are relative because the site lives under
+       /movie-streaming-notis/ on GitHub Pages, not at the domain root. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+
+  <!-- iPhone reads these tags instead of the manifest for some settings. -->
+  <!-- The home-screen icon. iOS rounds the corners itself. -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <!-- Open full-screen from the home screen, with no Safari address bar. -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- The label under the icon (iOS cuts off anything past about 12 characters). -->
+  <meta name="apple-mobile-web-app-title" content="Movie Update">
+  <!-- The page draws behind the status bar (time, battery); the safe-area
+       padding in style.css keeps our content below it. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
