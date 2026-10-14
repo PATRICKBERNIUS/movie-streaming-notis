@@ -1,0 +1,41 @@
+name: Weekly streaming availability check
+
+on:
+  schedule:
+    # Every Friday at 15:00 UTC (11:00 AM Eastern during daylight time).
+    # GitHub cron always runs in UTC.
+    - cron: "0 15 * * 5"
+  workflow_dispatch: {}  # adds a "Run workflow" button in the Actions tab for testing
+
+permissions:
+  contents: write  # lets the job commit seen_state.json back to the repo
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run availability check
+        env:
+          WATCHMODE_API_KEY: ${{ secrets.WATCHMODE_API_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          ONLY_NEW: "false"
+        run: python check_availability.py
+
+      - name: Save updated state
+        run: |
+          git config user.name "reel-ledger-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add seen_state.json
+          git diff --staged --quiet || git commit -m "Update seen_state.json"
+          git push
