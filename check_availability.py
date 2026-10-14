@@ -78,14 +78,31 @@ def get_sources(watchmode_id):
     return resp.json()
 
 
+def normalize_name(name):
+    # "Disney+" -> "disney", "Apple TV+" -> "apple tv"
+    return " ".join(name.lower().replace("+", "").split())
+
+
+def same_service(watchmode_name, mine):
+    """
+    Exact match, or one name is the other followed by a space and more words
+    ("Peacock Premium" matches "Peacock"). A plain "contains" check is avoided
+    on purpose: "max" is inside "Cinemax". Keep this identical to sameService()
+    in worker/index.js so the app and the Friday alert always agree.
+    """
+    a, b = normalize_name(watchmode_name or ""), normalize_name(mine or "")
+    if not a or not b:
+        return False
+    return a == b or a.startswith(b + " ") or b.startswith(a + " ")
+
+
 def matching_services(sources, my_services):
     matches = set()
     for s in sources:
         if s.get("type") != "sub":
             continue
-        name = s.get("name", "")
         for my_service in my_services:
-            if my_service.lower().replace("+", "") in name.lower() or name.lower() in my_service.lower():
+            if same_service(s.get("name", ""), my_service):
                 matches.add(my_service)
     return matches
 
