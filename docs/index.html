@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover lets the page use the full iPhone screen; style.css
+       then pads around the notch and home bar with env(safe-area-inset-*). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14110F">
+  <title>Movie Streaming Update</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Two "screens" in one page. app.js shows one and hides the other, so
+       there is no page reload and no second HTML file to keep in sync. -->
+
+  <main id="login-view" class="login" hidden>
+    <h1>Movie Streaming Update</h1>
+    <form id="login-form">
+      <label for="passphrase">Passphrase</label>
+      <!-- type=password + autocomplete lets the iPhone keychain offer to save it. -->
+      <input id="passphrase" type="password" autocomplete="current-password" required>
+      <button type="submit">Unlock</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </main>
+
+  <main id="app-view" hidden>
+    <header class="topbar">
+      <h1>Movie Streaming Update</h1>
+      <button id="lock-button" class="quiet" type="button">Lock</button>
+    </header>
+
+    <form id="add-form" class="add-form">
+      <input id="add-title" type="text" placeholder="Movie title" aria-label="Movie title"
+             maxlength="200" autocomplete="off" required>
+      <!-- inputmode=numeric shows the number pad on phones; a type=number field
+           would add spinner arrows and accept things like "2e3". -->
+      <input id="add-year" type="text" inputmode="numeric" placeholder="Year"
+             aria-label="Year (optional)" pattern="\d{4}" maxlength="4">
+      <button id="add-button" type="submit">Add</button>
+    </form>
+
+    <!-- <details> is a built-in collapsible section: no JavaScript needed to
+         open and close it, and it keeps the grid as the first thing you see. -->
+    <details id="services-panel" class="services">
+      <summary>Your services <span id="services-count" class="muted"></span></summary>
+      <ul id="services-list" class="chips"></ul>
+      <form id="service-form" class="service-form">
+        <!-- list= links the input to the suggestions below. Names must match
+             what Watchmode calls each service, so suggestions avoid typos. -->
+        <input id="service-name" type="text" list="service-suggestions"
+               placeholder="Add a service" aria-label="Service name"
+               maxlength="60" autocomplete="off" required>
+        <button id="service-button" type="submit">Add</button>
+      </form>
+      <datalist id="service-suggestions">
+        <option value="Netflix"><option value="Hulu"><option value="Max">
+        <option value="Disney+"><option value="Amazon Prime Video"><option value="Apple TV+">
+        <option value="Peacock"><option value="Paramount+"><option value="Crunchyroll">
+        <option value="Starz"><option value="MGM+"><option value="AMC+"><option value="Criterion Channel">
+      </datalist>
+    </details>
+
+    <div class="toolbar">
+      <button id="check-button" type="button">Check availability</button>
+      <label class="sort">
+        Sort
+        <select id="sort-select">
+          <option value="title">Title</option>
+          <option value="year">Year</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- role=status makes screen readers announce messages written here. -->
+    <p id="status" class="status" role="status"></p>
+
+    <!-- Filled by app.js: one grid before a check, three groups after. -->
+    <div id="results"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
