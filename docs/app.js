@@ -34,6 +34,14 @@ let checking = false;
 let results = new Map();
 const keyOf = (title) => title.toLowerCase();
 
+// Poster image URLs, same keys. A null value means "TMDB has no poster", so
+// we don't ask again. Kept outside render() so redrawing the grid (which
+// happens often during a check) never re-fetches a poster.
+const posters = new Map();
+const POSTER_CONCURRENCY = 4;
+let postersLoading = false;
+let postersOff = false; // set when the Worker can't do posters at all
+
 // ---------------------------------------------------------------------------
 // Storage. Wrapped in try/catch because private browsing or locked-down
 // settings can make localStorage throw; the app should still work, it just
@@ -116,6 +124,7 @@ function lock(message = "") {
   movies = [];
   services = [];
   results = new Map();
+  postersOff = false; // give posters another try after you log back in
   showLogin(message);
 }
 
@@ -130,6 +139,7 @@ function applyData(data) {
   services = data.services;
   renderServices();
   render();
+  loadPosters();
 }
 
 // ---------------------------------------------------------------------------
@@ -205,9 +215,16 @@ function makeCard(movie) {
   // <img onerror=...> could execute code. textContent never does.
   const li = document.createElement("li");
   li.className = "card";
+  // Lets showPoster() find this card later without redrawing the whole grid.
+  li.dataset.key = keyOf(movie.title);
 
   const poster = document.createElement("div");
   poster.className = "poster";
+  const url = posters.get(li.dataset.key);
+  if (url) {
+    poster.classList.add("has-image");
+    poster.append(posterImage(url));
+  }
   poster.append(span("title", movie.title));
   if (movie.year) poster.append(span("year", movie.year));
 
@@ -231,6 +248,81 @@ function span(className, text) {
   el.className = className;
   el.textContent = text;
   return el;
+}
+
+function posterImage(url) {
+  const img = document.createElement("img");
+  img.src = url;
+  // alt="" because the title is already written on the card; a screen reader
+  // would otherwise read every title twice.
+  img.alt = "";
+  // loading=lazy: the browser only downloads images that are near the screen,
+  // so opening the app doesn't pull 60 posters over mobile data at once.
+  img.loading = "lazy";
+  img.className = "poster-img";
+  // If the image fails, fall back to the plain tile rather than a broken icon.
+  img.addEventListener("error", () => {
+    img.parentElement?.classList.remove("has-image");
+    img.remove();
+  });
+  return img;
+}
+
+/** Put a newly arrived poster into its card(s) without redrawing the grid. */
+function showPoster(key) {
+  const url = posters.get(key);
+  if (!url) return;
+  for (const card of document.querySelectorAll(`.card[data-key="${CSS.escape(key)}"]`)) {
+    const poster = card.querySelector(".poster");
+    if (poster.querySelector("img")) continue;
+    poster.classList.add("has-image");
+    poster.prepend(posterImage(url));
+  }
+}
+
+/**
+ * Fetch posters for every movie that doesn't have one yet, a few at a time
+ * (same shared-queue idea as checkAll). Posters are decoration, so failures
+ * stay quiet unless the Worker can't do posters at all.
+ */
+async function loadPosters() {
+  if (postersLoading || postersOff) return;
+  postersLoading = true;
+
+  const queue = sortMovies(movies).filter((m) => !posters.has(keyOf(m.title)));
+
+  async function worker() {
+    while (queue.length && !postersOff && passphrase) {
+      const movie = queue.shift();
+      const key = keyOf(movie.title);
+      try {
+        const params = new URLSearchParams({ title: movie.title });
+        if (movie.year) params.set("year", movie.year);
+        const r = await api(`/api/poster?${params}`);
+        posters.set(key, r.url);
+        showPoster(key);
+      } catch (err) {
+        if (err.status === 401) {
+          handleError(err);
+          return;
+        }
+        if (err.status >= 500 || err.status === 429 || err.status === 0) {
+          // Missing TMDB key, bad key, rate limit, or offline: every poster
+          // would fail the same way, so stop and say why once.
+          postersOff = true;
+          setStatus(`Posters unavailable: ${err.message}`, true);
+          return;
+        }
+        posters.set(key, null); // e.g. a 400 for one odd title; skip it
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: POSTER_CONCURRENCY }, worker));
+  postersLoading = false;
+
+  // A movie added while we were busy still needs its poster.
+  if (passphrase && movies.some((m) => !posters.has(keyOf(m.title)))) loadPosters();
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +379,7 @@ async function addMovie(event) {
     const data = await api("/api/movies", { method: "POST", body: { title, year: year || null } });
     movies = data.movies;
     render();
+    loadPosters();
     $("add-form").reset();
     setStatus(`Added "${title}".`);
     $("add-title").focus();

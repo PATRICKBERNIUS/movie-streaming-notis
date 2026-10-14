@@ -11,7 +11,7 @@
  *                                           --(key)----> Watchmode
  *
  * CONFIGURATION (set in the Cloudflare dashboard, never in this file)
- *   Secrets:  GITHUB_TOKEN, WATCHMODE_API_KEY, APP_PASSPHRASE
+ *   Secrets:  GITHUB_TOKEN, WATCHMODE_API_KEY, APP_PASSPHRASE, TMDB_API_KEY
  *   Plain variables: GITHUB_OWNER, GITHUB_REPO, ALLOWED_ORIGIN
  *                    (optional: MOVIES_PATH, SERVICES_PATH, GITHUB_BRANCH)
  *
@@ -22,6 +22,7 @@
  *   DELETE /api/movies?title=...          remove a movie
  *   PUT    /api/services {services:[..]}  replace the subscribed-services list
  *   GET    /api/check?title=..&year=..    which of MY services stream this movie
+ *   GET    /api/poster?title=..&year=..   { url } of a TMDB poster image, or null
  */
 
 // ---------------------------------------------------------------------------
@@ -259,6 +260,30 @@ async function checkAvailability(env, title, year, myServices) {
 }
 
 // ---------------------------------------------------------------------------
+// TMDB: poster images. Same lookup as the Streamlit app: search by title
+// (and year when we know it) and use the top result's poster.
+// ---------------------------------------------------------------------------
+
+async function findPoster(env, title, year) {
+  if (!env.TMDB_API_KEY) {
+    throw new HttpError(500, "Server is missing the TMDB_API_KEY secret.");
+  }
+  const params = new URLSearchParams({ api_key: env.TMDB_API_KEY, query: title });
+  if (year) params.set("year", year);
+
+  const res = await fetch(`https://api.themoviedb.org/3/search/movie?${params}`);
+  if (res.status === 401) throw new HttpError(502, "TMDB rejected the API key.");
+  if (res.status === 429) throw new HttpError(429, "TMDB rate limit reached. Try again later.");
+  if (!res.ok) throw new HttpError(502, `TMDB returned ${res.status}.`);
+
+  const top = ((await res.json()).results || [])[0];
+  // The image itself is served by TMDB's public image server, which needs no
+  // key, so the page can load it directly. w342 = 342px wide: sharp on a
+  // phone screen in a 2-column grid without downloading a full-size poster.
+  return top && top.poster_path ? `https://image.tmdb.org/t/p/w342${top.poster_path}` : null;
+}
+
+// ---------------------------------------------------------------------------
 // Input validation (never trust what the browser sends)
 // ---------------------------------------------------------------------------
 
@@ -368,6 +393,17 @@ async function route(request, env) {
       throw new HttpError(400, "Pick at least one streaming service first.");
     }
     return json({ title, year, ...(await checkAvailability(env, title, year, myServices)) });
+  }
+
+  if (pathname === "/api/poster" && method === "GET") {
+    const title = cleanTitle(url.searchParams.get("title"));
+    const year = cleanYear(url.searchParams.get("year"));
+    const response = json({ title, year, url: await findPoster(env, title, year) });
+    // A movie's poster doesn't change, so let the phone keep the answer for a
+    // week instead of asking again on every visit. "private" means only your
+    // browser may store it, never a shared cache in between.
+    response.headers.set("Cache-Control", "private, max-age=604800");
+    return response;
   }
 
   throw new HttpError(404, "No such route.");

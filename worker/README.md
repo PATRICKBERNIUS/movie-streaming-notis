@@ -32,6 +32,7 @@ Worker -> **Settings** -> **Variables and Secrets** -> Add. Use the right *type*
 | `GITHUB_TOKEN` | **Secret** | token from step 1 |
 | `WATCHMODE_API_KEY` | **Secret** | your Watchmode key |
 | `APP_PASSPHRASE` | **Secret** | a long phrase you invent (this is your app login) |
+| `TMDB_API_KEY` | **Secret** | TMDB "API Key" (v3), for posters. Free at themoviedb.org → Settings → API |
 | `GITHUB_OWNER` | Text | your GitHub username |
 | `GITHUB_REPO` | Text | this repo's name |
 | `ALLOWED_ORIGIN` | Text | `https://YOURUSERNAME.github.io,http://localhost:8000` |
@@ -68,6 +69,8 @@ expect `{"error":"Wrong or missing passphrase."}`.
 | `GitHub returned 404` | `GITHUB_OWNER` / `GITHUB_REPO` misspelled |
 | `Watchmode rejected the API key` | `WATCHMODE_API_KEY` wrong |
 | `Server is missing the APP_PASSPHRASE secret` | add it, then Deploy |
+| `Posters unavailable: ...missing the TMDB_API_KEY secret` | add it, then Deploy |
+| `TMDB rejected the API key` | used the long "Read Access Token" instead of the short "API Key" |
 
 ## Changing the code later
 
