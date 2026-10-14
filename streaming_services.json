@@ -1,3 +1,11 @@
 {
-  "services": []
+  "services": [
+    "Netflix",
+    "Disney+",
+    "Amazon Prime Video",
+    "Max",
+    "Hulu",
+    "Peacock",
+    "Crunchyroll"
+  ]
 }
