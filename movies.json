@@ -1,51 +1,63 @@
 [
   {
     "title": "Letters From Iwo Jima",
-    "year": null
+    "year": "2006",
+    "tmdb_id": 1251
   },
   {
     "title": "Scent of a Woman",
-    "year": null
+    "year": "1992",
+    "tmdb_id": 9475
   },
   {
     "title": "Escape From New York",
-    "year": null
+    "year": "1981",
+    "tmdb_id": 1103
   },
   {
     "title": "The King of Comedy",
-    "year": null
+    "year": "1982",
+    "tmdb_id": 262
   },
   {
     "title": "The Assassination of Jesse James by the Coward Robert Ford",
-    "year": null
+    "year": "2007",
+    "tmdb_id": 4512
   },
   {
     "title": "Serpico",
-    "year": null
+    "year": "1973",
+    "tmdb_id": 9040
   },
   {
     "title": "Cape Fear",
-    "year": null
+    "year": "1991",
+    "tmdb_id": 1598
   },
   {
     "title": "F1",
-    "year": null
+    "year": "2025",
+    "tmdb_id": 911430
   },
   {
     "title": "The score",
-    "year": null
+    "year": "2001",
+    "tmdb_id": 11371
   },
   {
     "title": "Color of money",
-    "year": null
+    "year": "1986",
+    "tmdb_id": 11873
   },
   {
     "title": "The King",
-    "year": null
+    "year": "1994",
+    "tmdb_id": 8587
   },
   {
     "title": "Flags of our fathers",
-    "year": null
+    "year": "2006",
+    "tmdb_id": 3683
   },
   {
     "title": "US Marshalls",
@@ -53,198 +65,247 @@
   },
   {
     "title": "Bullitt",
-    "year": null
+    "year": "1968",
+    "tmdb_id": 916
   },
   {
     "title": "Rainmaker",
-    "year": null
+    "year": "1997",
+    "tmdb_id": 11975
   },
   {
     "title": "American Made",
-    "year": null
+    "year": "2017",
+    "tmdb_id": 337170
   },
   {
     "title": "The Firm",
-    "year": null
+    "year": "1993",
+    "tmdb_id": 37233
   },
   {
     "title": "The Hustler",
-    "year": null
+    "year": "1961",
+    "tmdb_id": 990
   },
   {
     "title": "Incendies",
-    "year": null
+    "year": "2010",
+    "tmdb_id": 46738
   },
   {
     "title": "The Brutalist",
-    "year": null
+    "year": "2024",
+    "tmdb_id": 549509
   },
   {
     "title": "The Guard",
-    "year": null
+    "year": "2020",
+    "tmdb_id": 547016
   },
   {
     "title": "Disturbia",
-    "year": null
+    "year": "2007",
+    "tmdb_id": 8271
   },
   {
     "title": "The Help",
-    "year": null
+    "year": "2011",
+    "tmdb_id": 50014
   },
   {
     "title": "Pale Rider",
-    "year": null
+    "year": "1985",
+    "tmdb_id": 8879
   },
   {
     "title": "A Patch of Fog",
-    "year": null
+    "year": "2015",
+    "tmdb_id": 356187
   },
   {
     "title": "Master and Commander",
-    "year": null
+    "year": "2003",
+    "tmdb_id": 8619
   },
   {
     "title": "Half Nelson",
-    "year": null
+    "year": "2006",
+    "tmdb_id": 7859
   },
   {
     "title": "We Live in Public",
-    "year": null
+    "year": "2009",
+    "tmdb_id": 34015
   },
   {
     "title": "The Game",
-    "year": null
+    "year": "1997",
+    "tmdb_id": 2649
   },
   {
     "title": "Blue Valentine",
-    "year": null
+    "year": "2010",
+    "tmdb_id": 46705
   },
   {
     "title": "The Notebook",
-    "year": null
+    "year": "2004",
+    "tmdb_id": 11036
   },
   {
     "title": "Donnie Brasco",
-    "year": null
+    "year": "1997",
+    "tmdb_id": 9366
   },
   {
     "title": "Platoon",
-    "year": null
+    "year": "1986",
+    "tmdb_id": 792
   },
   {
     "title": "The covenant",
-    "year": null
+    "year": "2023",
+    "tmdb_id": 882569
   },
   {
     "title": "The Natural",
-    "year": null
+    "year": "1984",
+    "tmdb_id": 11393
   },
   {
     "title": "Trainspotting",
-    "year": null
+    "year": "1996",
+    "tmdb_id": 627
   },
   {
     "title": "The Piano",
-    "year": null
+    "year": "1993",
+    "tmdb_id": 713
   },
   {
     "title": "Killers of the Flower Moon",
-    "year": null
+    "year": "2023",
+    "tmdb_id": 466420
   },
   {
     "title": "Bronx Tale",
-    "year": null
+    "year": "1993",
+    "tmdb_id": 1607
   },
   {
     "title": "28 Days Later",
-    "year": null
+    "year": "2002",
+    "tmdb_id": 170
   },
   {
     "title": "The Jackal",
-    "year": null
+    "year": "1997",
+    "tmdb_id": 4824
   },
   {
     "title": "Kiss Kiss Bang Bang",
-    "year": null
+    "year": "2005",
+    "tmdb_id": 5236
   },
   {
     "title": "Adaptation",
-    "year": null
+    "year": "2002",
+    "tmdb_id": 2757
   },
   {
     "title": "Man in the iron mask",
-    "year": null
+    "year": "1998",
+    "tmdb_id": 9313
   },
   {
     "title": "Crouching tiger hidden dragon",
-    "year": null
+    "year": "2000",
+    "tmdb_id": 146
   },
   {
     "title": "The Rip",
-    "year": null
+    "year": "2026",
+    "tmdb_id": 1306368
   },
   {
     "title": "Is this thing on?",
-    "year": null
+    "year": "2025",
+    "tmdb_id": 1140498
   },
   {
     "title": "Wag the dog",
-    "year": null
+    "year": "1997",
+    "tmdb_id": 586
   },
   {
     "title": "Meet Joe black",
-    "year": null
+    "year": "1998",
+    "tmdb_id": 297
   },
   {
     "title": "Code 8",
-    "year": null
+    "year": "2019",
+    "tmdb_id": 461130
   },
   {
     "title": "Contact",
-    "year": null
+    "year": "1997",
+    "tmdb_id": 686
   },
   {
     "title": "Girl with the dragon tattoo",
-    "year": null
+    "year": "2011",
+    "tmdb_id": 65754
   },
   {
     "title": "waiting for the barbarians",
-    "year": null
+    "year": "2020",
+    "tmdb_id": 505707
   },
   {
     "title": "The Gift",
-    "year": null
+    "year": "2015",
+    "tmdb_id": 328425
   },
   {
     "title": "Before the Devil Knows You’re Dead",
-    "year": null
+    "year": "2007",
+    "tmdb_id": 7972
   },
   {
     "title": "Primal Fear",
-    "year": null
+    "year": "1996",
+    "tmdb_id": 1592
   },
   {
     "title": "Winter’s Bone",
-    "year": null
+    "year": "2010",
+    "tmdb_id": 39013
   },
   {
     "title": "The Ministry of Ungentlemanly Warfare",
-    "year": null
+    "year": "2024",
+    "tmdb_id": 799583
   },
   {
     "title": "Supergirl",
-    "year": null
+    "year": "2026",
+    "tmdb_id": 1081003
   },
   {
     "title": "Primetime",
-    "year": "2026"
+    "year": "2026",
+    "tmdb_id": 1375441
   },
   {
     "title": "Constantine",
-    "year": "2005"
+    "year": "2005",
+    "tmdb_id": 561
   },
   {
     "title": "Batman Knightfall",
-    "year": null
+    "year": "2026",
+    "tmdb_id": 1560520
   }
 ]
