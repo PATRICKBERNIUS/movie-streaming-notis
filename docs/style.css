@@ -191,6 +191,79 @@ select {
   color: var(--text);
 }
 
+button.secondary { background: var(--surface-2); color: var(--text); }
+
+/* ---- Suggestions under the add form ---- */
+/* position: relative here lets the list below float over the page
+   (position: absolute) instead of pushing everything down as it appears. */
+.add-area { position: relative; }
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.suggestion {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 400;
+  text-align: left;
+}
+.suggestion:hover, .suggestion:focus-visible { background: var(--surface-2); }
+.suggestion-text, .match-body { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
+.suggestion .title, .match-body .title { font-weight: 600; }
+.suggestion .year { color: var(--muted); font-size: 0.9rem; }
+
+.thumb {
+  flex: none;
+  width: 40px;
+  aspect-ratio: 2 / 3;
+  border-radius: 4px;
+  background: var(--surface-2);
+  object-fit: cover;
+}
+
+/* ---- Match years ---- */
+.match { margin-top: 16px; }
+.match h2 { font-size: 1.1rem; margin: 0 0 4px; }
+.match > p { margin: 0 0 12px; }
+.match-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.match-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.match-body select { width: 100%; }
+.match-body .year { color: var(--muted); font-size: 0.9rem; }
+/* Keep Save reachable at the bottom of a long list. */
+.match-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+
 /* ---- Groups after a check ---- */
 .group + .group { margin-top: 24px; }
 .group h2 { font-size: 1rem; color: var(--muted); margin: 0 0 10px; }

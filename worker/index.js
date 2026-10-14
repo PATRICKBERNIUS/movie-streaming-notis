@@ -18,11 +18,16 @@
  * ROUTES
  *   GET    /api/health                    no auth; "is it deployed?" check
  *   GET    /api/data                      { movies, services }
- *   POST   /api/movies   {title, year}    add a movie (rejects duplicate titles)
+ *   POST   /api/movies   {title, year, tmdb_id}  add a movie (rejects duplicate titles)
+ *   PATCH  /api/movies   {updates:[{title, year, tmdb_id}]}  set year/TMDB id on many at once
  *   DELETE /api/movies?title=...          remove a movie
  *   PUT    /api/services {services:[..]}  replace the subscribed-services list
- *   GET    /api/check?title=..&year=..    which of MY services stream this movie
- *   GET    /api/poster?title=..&year=..   { url } of a TMDB poster image, or null
+ *   GET    /api/search?q=..&year=..       TMDB matches, for suggestions while typing
+ *   GET    /api/check?title=..&year=..&tmdb_id=..   which of MY services stream this movie
+ *   GET    /api/poster?title=..&year=..&tmdb_id=..  { url } of a TMDB poster image, or null
+ *
+ * A movie in movies.json looks like { title, year, tmdb_id }. year and tmdb_id
+ * may be null. tmdb_id pins down exactly which film we mean.
  */
 
 // ---------------------------------------------------------------------------
@@ -78,7 +83,7 @@ function corsHeaders(request, env) {
   const allowed = (env.ALLOWED_ORIGIN || "").split(",").map((s) => s.trim()).filter(Boolean);
   const origin = request.headers.get("Origin");
   const headers = {
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Passphrase",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -226,31 +231,39 @@ function sameService(watchmodeName, mine) {
   return a === b || a.startsWith(b + " ") || b.startsWith(a + " ");
 }
 
+/** GET from Watchmode. Returns null on 404 so callers can fall back. */
 async function watchmodeGet(env, url) {
   const res = await fetch(url);
+  if (res.status === 404) return null;
   if (res.status === 401) throw new HttpError(502, "Watchmode rejected the API key.");
   if (res.status === 429) throw new HttpError(429, "Watchmode rate limit reached. Try again later.");
   if (!res.ok) throw new HttpError(502, `Watchmode returned ${res.status}.`);
   return res.json();
 }
 
-async function checkAvailability(env, title, year, myServices) {
+async function checkAvailability(env, title, year, tmdbId, myServices) {
   const key = encodeURIComponent(env.WATCHMODE_API_KEY);
+  const sourcesUrl = (id) =>
+    `https://api.watchmode.com/v1/title/${id}/sources/?apiKey=${key}&regions=US`;
 
-  const search = await watchmodeGet(
-    env,
-    `https://api.watchmode.com/v1/search/?apiKey=${key}&search_field=name&search_value=${encodeURIComponent(title)}`
-  );
-  const movies = (search.title_results || []).filter((r) => r.type === "movie");
-  if (movies.length === 0) return { matched: false, availableOn: [] };
+  // Watchmode accepts TMDB IDs as "movie-<id>". When we know the TMDB ID we
+  // skip the search: one Watchmode call instead of two, and no chance of
+  // picking the wrong film. 404 means Watchmode hasn't linked that ID; then
+  // fall through to searching by title like before.
+  let sources = tmdbId ? await watchmodeGet(env, sourcesUrl(`movie-${tmdbId}`)) : null;
 
-  // Prefer the result with the right year; otherwise take Watchmode's top hit.
-  const match = (year && movies.find((m) => String(m.year) === String(year))) || movies[0];
+  if (!sources) {
+    const search = await watchmodeGet(
+      env,
+      `https://api.watchmode.com/v1/search/?apiKey=${key}&search_field=name&search_value=${encodeURIComponent(title)}`
+    );
+    const movies = ((search && search.title_results) || []).filter((r) => r.type === "movie");
+    if (movies.length === 0) return { matched: false, availableOn: [] };
 
-  const sources = await watchmodeGet(
-    env,
-    `https://api.watchmode.com/v1/title/${match.id}/sources/?apiKey=${key}&regions=US`
-  );
+    // Prefer the result with the right year; otherwise take Watchmode's top hit.
+    const match = (year && movies.find((m) => String(m.year) === String(year))) || movies[0];
+    sources = (await watchmodeGet(env, sourcesUrl(match.id))) || [];
+  }
 
   // type "sub" = included with a subscription (as opposed to rent / buy / free).
   const availableOn = myServices.filter((mine) =>
@@ -260,27 +273,54 @@ async function checkAvailability(env, title, year, myServices) {
 }
 
 // ---------------------------------------------------------------------------
-// TMDB: poster images. Same lookup as the Streamlit app: search by title
-// (and year when we know it) and use the top result's poster.
+// TMDB: posters, and the suggestions shown while you type a title.
 // ---------------------------------------------------------------------------
 
-async function findPoster(env, title, year) {
+// TMDB's public image server needs no key, so the page loads images directly.
+// The size in the path is the width in pixels: w342 is sharp in the 2-column
+// grid, w92 is plenty for the small thumbnails next to a suggestion.
+const tmdbImage = (path, size) => (path ? `https://image.tmdb.org/t/p/${size}${path}` : null);
+
+/** GET from TMDB's API. Returns null on 404 so callers can fall back. */
+async function tmdbGet(env, path, params = {}) {
   if (!env.TMDB_API_KEY) {
     throw new HttpError(500, "Server is missing the TMDB_API_KEY secret.");
   }
-  const params = new URLSearchParams({ api_key: env.TMDB_API_KEY, query: title });
-  if (year) params.set("year", year);
-
-  const res = await fetch(`https://api.themoviedb.org/3/search/movie?${params}`);
+  const query = new URLSearchParams({ api_key: env.TMDB_API_KEY, ...params });
+  const res = await fetch(`https://api.themoviedb.org/3${path}?${query}`);
+  if (res.status === 404) return null;
   if (res.status === 401) throw new HttpError(502, "TMDB rejected the API key.");
   if (res.status === 429) throw new HttpError(429, "TMDB rate limit reached. Try again later.");
   if (!res.ok) throw new HttpError(502, `TMDB returned ${res.status}.`);
+  return res.json();
+}
 
-  const top = ((await res.json()).results || [])[0];
-  // The image itself is served by TMDB's public image server, which needs no
-  // key, so the page can load it directly. w342 = 342px wide: sharp on a
-  // phone screen in a 2-column grid without downloading a full-size poster.
-  return top && top.poster_path ? `https://image.tmdb.org/t/p/w342${top.poster_path}` : null;
+/** Search TMDB for movies by title. Best match first, as TMDB ranks them. */
+async function searchTmdb(env, query, year) {
+  const params = { query };
+  if (year) params.year = year;
+  const data = await tmdbGet(env, "/search/movie", params);
+  return ((data && data.results) || []).slice(0, 8).map((m) => ({
+    tmdb_id: m.id,
+    title: m.title,
+    // release_date is "YYYY-MM-DD", or "" when TMDB doesn't know it.
+    year: (m.release_date || "").slice(0, 4) || null,
+    thumb: tmdbImage(m.poster_path, "w92"),
+  }));
+}
+
+async function findPoster(env, title, year, tmdbId) {
+  // Exact film when we know its TMDB ID; otherwise the top search result,
+  // the same lookup the Streamlit app used.
+  if (tmdbId) {
+    const movie = await tmdbGet(env, `/movie/${tmdbId}`);
+    if (movie) return tmdbImage(movie.poster_path, "w342");
+  }
+  const params = { query: title };
+  if (year) params.year = year;
+  const data = await tmdbGet(env, "/search/movie", params);
+  const top = ((data && data.results) || [])[0];
+  return top ? tmdbImage(top.poster_path, "w342") : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -299,6 +339,14 @@ function cleanYear(value) {
   const year = String(value).trim();
   if (!/^\d{4}$/.test(year)) throw new HttpError(400, "Year must be four digits, like 2024.");
   return year;
+}
+
+function cleanTmdbId(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const id = String(value).trim();
+  // Digits only: the ID ends up inside API URLs, so nothing else gets through.
+  if (!/^\d{1,10}$/.test(id)) throw new HttpError(400, "tmdb_id must be a number.");
+  return Number(id);
 }
 
 async function readBody(request) {
@@ -337,6 +385,7 @@ async function route(request, env) {
     const body = await readBody(request);
     const title = cleanTitle(body.title);
     const year = cleanYear(body.year);
+    const tmdb_id = cleanTmdbId(body.tmdb_id);
     const movies = await updateJsonFile(
       env,
       moviesPath(env),
@@ -345,11 +394,44 @@ async function route(request, env) {
         if (list.some((m) => m.title.toLowerCase() === title.toLowerCase())) {
           throw new HttpError(409, `"${title}" is already on your list.`);
         }
-        return [...list, { title, year }];
+        return [...list, { title, year, tmdb_id }];
       },
       `Add '${title}' via Movie Streaming Update`
     );
     return json({ movies });
+  }
+
+  // Set year and TMDB id on many movies in one save. Used by "Match years",
+  // so 60 fixes become one commit instead of 60. Titles are not changed, so
+  // the duplicate rule and the Friday job's history are unaffected.
+  if (pathname === "/api/movies" && method === "PATCH") {
+    const body = await readBody(request);
+    if (!Array.isArray(body.updates) || body.updates.length > 1000) {
+      throw new HttpError(400, "updates must be a list of { title, year, tmdb_id }.");
+    }
+    const updates = new Map(
+      body.updates.map((u = {}) => [
+        cleanTitle(u && u.title).toLowerCase(),
+        { year: cleanYear(u && u.year), tmdb_id: cleanTmdbId(u && u.tmdb_id) },
+      ])
+    );
+    let changed = 0;
+    const movies = await updateJsonFile(
+      env,
+      moviesPath(env),
+      [],
+      (list) => {
+        changed = 0;
+        return list.map((m) => {
+          const u = updates.get(m.title.toLowerCase());
+          if (!u) return m; // not in this batch, or removed since: leave as is
+          changed++;
+          return { ...m, ...u };
+        });
+      },
+      `Match years for ${updates.size} movie(s) via Movie Streaming Update`
+    );
+    return json({ movies, changed });
   }
 
   if (pathname === "/api/movies" && method === "DELETE") {
@@ -384,21 +466,29 @@ async function route(request, env) {
     return json({ services });
   }
 
+  if (pathname === "/api/search" && method === "GET") {
+    const query = cleanTitle(url.searchParams.get("q"));
+    const year = cleanYear(url.searchParams.get("year"));
+    return json({ results: await searchTmdb(env, query, year) });
+  }
+
   if (pathname === "/api/check" && method === "GET") {
     const title = cleanTitle(url.searchParams.get("title"));
     const year = cleanYear(url.searchParams.get("year"));
+    const tmdbId = cleanTmdbId(url.searchParams.get("tmdb_id"));
     const { data } = await readJsonFile(env, servicesPath(env), { services: [] });
     const myServices = data.services || [];
     if (myServices.length === 0) {
       throw new HttpError(400, "Pick at least one streaming service first.");
     }
-    return json({ title, year, ...(await checkAvailability(env, title, year, myServices)) });
+    return json({ title, year, ...(await checkAvailability(env, title, year, tmdbId, myServices)) });
   }
 
   if (pathname === "/api/poster" && method === "GET") {
     const title = cleanTitle(url.searchParams.get("title"));
     const year = cleanYear(url.searchParams.get("year"));
-    const response = json({ title, year, url: await findPoster(env, title, year) });
+    const tmdbId = cleanTmdbId(url.searchParams.get("tmdb_id"));
+    const response = json({ title, year, url: await findPoster(env, title, year, tmdbId) });
     // A movie's poster doesn't change, so let the phone keep the answer for a
     // week instead of asking again on every visit. "private" means only your
     // browser may store it, never a shared cache in between.

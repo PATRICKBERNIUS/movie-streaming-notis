@@ -42,6 +42,26 @@ const POSTER_CONCURRENCY = 4;
 let postersLoading = false;
 let postersOff = false; // set when the Worker can't do posters at all
 
+// The TMDB suggestion you tapped while adding a movie, so the Worker gets the
+// exact film. Cleared as soon as you edit the title or year by hand.
+let picked = null;
+let searchTimer = null;
+let searchSeq = 0; // lets us ignore answers to searches we no longer care about
+
+// "Match years" review: one row per movie being matched.
+// Each: { movie, candidates (null while loading), choice (index, or -1 = skip), el }
+let matchRows = [];
+let matchSession = 0; // bumped on open/close so a cancelled lookup stops
+const MATCH_CONCURRENCY = 4;
+
+/** title, year and tmdb_id as URL parameters, for /api/check and /api/poster. */
+function movieParams(movie) {
+  const params = new URLSearchParams({ title: movie.title });
+  if (movie.year) params.set("year", movie.year);
+  if (movie.tmdb_id) params.set("tmdb_id", movie.tmdb_id);
+  return params;
+}
+
 // ---------------------------------------------------------------------------
 // Storage. Wrapped in try/catch because private browsing or locked-down
 // settings can make localStorage throw; the app should still work, it just
@@ -125,6 +145,7 @@ function lock(message = "") {
   services = [];
   results = new Map();
   postersOff = false; // give posters another try after you log back in
+  closeMatch();
   showLogin(message);
 }
 
@@ -161,6 +182,10 @@ function sortMovies(list) {
 function render() {
   const container = $("results");
   container.replaceChildren();
+
+  const unmatched = movies.filter((m) => !m.tmdb_id).length;
+  $("match-button").hidden = unmatched === 0;
+  $("match-button").textContent = `Match years (${unmatched})`;
 
   if (movies.length === 0) {
     const p = document.createElement("p");
@@ -296,9 +321,7 @@ async function loadPosters() {
       const movie = queue.shift();
       const key = keyOf(movie.title);
       try {
-        const params = new URLSearchParams({ title: movie.title });
-        if (movie.year) params.set("year", movie.year);
-        const r = await api(`/api/poster?${params}`);
+        const r = await api(`/api/poster?${movieParams(movie)}`);
         posters.set(key, r.url);
         showPoster(key);
       } catch (err) {
@@ -376,11 +399,16 @@ async function addMovie(event) {
   try {
     // The Worker re-validates everything and enforces the duplicate rule;
     // the page just reports what it says.
-    const data = await api("/api/movies", { method: "POST", body: { title, year: year || null } });
+    const data = await api("/api/movies", {
+      method: "POST",
+      body: { title, year: year || null, tmdb_id: picked ? picked.tmdb_id : null },
+    });
     movies = data.movies;
     render();
     loadPosters();
     $("add-form").reset();
+    picked = null;
+    hideSuggestions();
     setStatus(`Added "${title}".`);
     $("add-title").focus();
   } catch (err) {
@@ -478,9 +506,7 @@ async function checkAll() {
     while (queue.length && !stopError) {
       const movie = queue.shift();
       try {
-        const params = new URLSearchParams({ title: movie.title });
-        if (movie.year) params.set("year", movie.year);
-        const r = await api(`/api/check?${params}`);
+        const r = await api(`/api/check?${movieParams(movie)}`);
         results.set(keyOf(movie.title), {
           group: r.availableOn.length ? "available" : "unavailable",
           availableOn: r.availableOn,
@@ -510,6 +536,229 @@ async function checkAll() {
     const available = [...results.values()].filter((r) => r.group === "available").length;
     const note = failed ? ` ${failed} couldn't be checked.` : "";
     setStatus(`Done. ${available} of ${total} available on your services.${note}`, failed > 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Suggestions while typing a title
+// ---------------------------------------------------------------------------
+
+function onTitleInput() {
+  picked = null; // the text no longer matches what was picked
+  clearTimeout(searchTimer);
+  const q = $("add-title").value.trim();
+  if (q.length < 2) {
+    hideSuggestions();
+    return;
+  }
+  // "Debounce": wait until typing pauses for 300ms before searching, so
+  // typing "Serpico" sends one request instead of seven.
+  searchTimer = setTimeout(() => searchSuggestions(q), 300);
+}
+
+async function searchSuggestions(q) {
+  const seq = ++searchSeq;
+  try {
+    const { results } = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    // An older, slower search can finish after a newer one. Only the most
+    // recent search may update the list.
+    if (seq !== searchSeq) return;
+    showSuggestions(results);
+  } catch (err) {
+    if (seq === searchSeq) hideSuggestions();
+    // Suggestions are a convenience: you can still add by typing, so only
+    // a rejected passphrase is worth interrupting you for.
+    if (err.status === 401) handleError(err);
+  }
+}
+
+function showSuggestions(list) {
+  const ul = $("suggestions");
+  ul.replaceChildren();
+  for (const s of list) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion";
+    button.append(thumb(s.thumb));
+    const text = document.createElement("span");
+    text.className = "suggestion-text";
+    text.append(span("title", s.title), span("year", s.year || "Year unknown"));
+    button.append(text);
+    button.addEventListener("click", () => pickSuggestion(s));
+    const li = document.createElement("li");
+    li.append(button);
+    ul.append(li);
+  }
+  ul.hidden = list.length === 0;
+}
+
+function hideSuggestions() {
+  searchSeq++; // any search still in flight is now out of date
+  clearTimeout(searchTimer);
+  $("suggestions").hidden = true;
+  $("suggestions").replaceChildren();
+}
+
+function pickSuggestion(s) {
+  picked = s;
+  $("add-title").value = s.title;
+  $("add-year").value = s.year || "";
+  hideSuggestions();
+  $("add-button").focus();
+}
+
+/** Small poster for suggestions and match rows; a blank tile if none. */
+function thumb(url) {
+  if (!url) {
+    const blank = document.createElement("span");
+    blank.className = "thumb";
+    return blank;
+  }
+  const img = document.createElement("img");
+  img.className = "thumb";
+  img.src = url;
+  img.alt = "";
+  return img;
+}
+
+// ---------------------------------------------------------------------------
+// Match years: find each unmatched movie on TMDB, let you confirm, save once
+// ---------------------------------------------------------------------------
+
+function showMatchView(open) {
+  $("match-view").hidden = !open;
+  // Hide the list and its buttons meanwhile, so it's clear what you're doing.
+  $("results").hidden = open;
+  $("toolbar").hidden = open;
+}
+
+async function openMatch() {
+  if (checking) {
+    setStatus("Wait for the check to finish first.", true);
+    return;
+  }
+  const session = ++matchSession;
+  matchRows = sortMovies(movies.filter((m) => !m.tmdb_id)).map((movie) => ({
+    movie,
+    candidates: null,
+    choice: -1,
+    el: null,
+  }));
+  for (const row of matchRows) row.el = makeMatchRow(row);
+  $("match-list").replaceChildren(...matchRows.map((r) => r.el));
+  $("match-save").disabled = true;
+  showMatchView(true);
+  setStatus(`Looking up ${matchRows.length} movies on TMDB…`);
+
+  // Same shared-queue pattern as checkAll and loadPosters.
+  const queue = [...matchRows];
+  let stopError = null;
+  async function worker() {
+    while (queue.length && !stopError && session === matchSession) {
+      const row = queue.shift();
+      try {
+        const params = new URLSearchParams({ q: row.movie.title });
+        if (row.movie.year) params.set("year", row.movie.year);
+        const { results } = await api(`/api/search?${params}`);
+        row.candidates = results;
+        row.choice = results.length ? 0 : -1; // TMDB's best match, or skip
+      } catch (err) {
+        if (err.status === 401 || err.status === 429 || err.status >= 500 || err.status === 0) {
+          stopError = err;
+        }
+        row.candidates = [];
+        row.choice = -1;
+      }
+      if (session !== matchSession) return; // cancelled while we waited
+      redrawMatchRow(row);
+    }
+  }
+  await Promise.all(Array.from({ length: MATCH_CONCURRENCY }, worker));
+  if (session !== matchSession) return;
+
+  $("match-save").disabled = false;
+  if (stopError) {
+    handleError(stopError);
+  } else {
+    const found = matchRows.filter((r) => r.choice >= 0).length;
+    setStatus(`Found matches for ${found} of ${matchRows.length}. Review them, then save.`);
+  }
+}
+
+function makeMatchRow(row) {
+  const li = document.createElement("li");
+  li.className = "match-row";
+  const chosen = row.candidates && row.candidates[row.choice];
+  const image = thumb(chosen && chosen.thumb);
+
+  const body = document.createElement("div");
+  body.className = "match-body";
+  body.append(span("title", row.movie.title));
+
+  if (row.candidates === null) {
+    body.append(span("year", "Looking up…"));
+  } else {
+    // A plain <select> gets the phone's native picker, which is easy to use
+    // with a thumb and needs no custom code.
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Match for ${row.movie.title}`);
+    row.candidates.forEach((c, i) => {
+      select.add(new Option(`${c.title} (${c.year || "year unknown"})`, String(i)));
+    });
+    select.add(new Option(row.candidates.length ? "Skip (none of these)" : "No match found", "-1"));
+    select.value = String(row.choice);
+    select.addEventListener("change", () => {
+      row.choice = Number(select.value);
+      redrawMatchRow(row); // updates the thumbnail to the newly chosen film
+    });
+    body.append(select);
+  }
+
+  li.append(image, body);
+  return li;
+}
+
+/** Swap a row's element for a freshly built one. */
+function redrawMatchRow(row) {
+  const old = row.el;
+  row.el = makeMatchRow(row);
+  old.replaceWith(row.el);
+}
+
+function closeMatch() {
+  matchSession++; // stops any lookups still running
+  matchRows = [];
+  showMatchView(false);
+}
+
+async function saveMatches() {
+  const updates = matchRows
+    .filter((r) => r.candidates && r.choice >= 0)
+    .map((r) => {
+      const c = r.candidates[r.choice];
+      return { title: r.movie.title, year: c.year, tmdb_id: c.tmdb_id };
+    });
+  if (updates.length === 0) {
+    closeMatch();
+    setStatus("Nothing to save.");
+    return;
+  }
+
+  $("match-save").disabled = true;
+  setStatus(`Saving ${updates.length} matches…`);
+  try {
+    // One request, so the Worker makes one commit for all of them.
+    const data = await api("/api/movies", { method: "PATCH", body: { updates } });
+    movies = data.movies;
+    // These posters were guessed from the title alone; fetch the exact ones.
+    for (const u of updates) posters.delete(keyOf(u.title));
+    closeMatch();
+    render();
+    loadPosters();
+    setStatus(`Saved ${data.changed} matches.`);
+  } catch (err) {
+    $("match-save").disabled = false;
+    handleError(err);
   }
 }
 
@@ -544,6 +793,21 @@ $("login-form").addEventListener("submit", unlock);
 $("add-form").addEventListener("submit", addMovie);
 $("service-form").addEventListener("submit", addService);
 $("check-button").addEventListener("click", checkAll);
+$("add-title").addEventListener("input", onTitleInput);
+$("add-year").addEventListener("input", () => { picked = null; });
+$("add-title").addEventListener("keydown", (e) => {
+  if (e.key === "Escape") hideSuggestions();
+});
+// Tapping anywhere outside the add area closes the suggestions.
+document.addEventListener("click", (e) => {
+  if (!$("add-area").contains(e.target)) hideSuggestions();
+});
+$("match-button").addEventListener("click", openMatch);
+$("match-save").addEventListener("click", saveMatches);
+$("match-cancel").addEventListener("click", () => {
+  closeMatch();
+  setStatus("");
+});
 $("lock-button").addEventListener("click", () => lock());
 $("sort-select").addEventListener("change", (e) => {
   sortBy = e.target.value;

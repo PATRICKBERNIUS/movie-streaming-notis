@@ -18,6 +18,7 @@ checkboxes write to when GitHub sync is connected.
 Optional:
   ONLY_NEW            - "true" to only alert on titles not flagged last run
                         (uses seen_state.json, persisted via git commit in the workflow)
+  APP_URL             - page that opens when you tap the notification
 """
 
 import json
@@ -29,6 +30,8 @@ import requests
 WATCHMODE_API_KEY = os.environ.get("WATCHMODE_API_KEY")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
 ONLY_NEW = os.environ.get("ONLY_NEW", "false").lower() == "true"
+# Not a secret: it's the public address of the app.
+APP_URL = os.environ.get("APP_URL", "https://patrickbernius.github.io/movie-streaming-notis/")
 
 MOVIES_FILE = "movies.json"
 SERVICES_FILE = "streaming_services.json"
@@ -68,14 +71,33 @@ def search_title(title, year=None):
     return results[0]
 
 
-def get_sources(watchmode_id):
+def get_sources(title_id):
+    """
+    title_id is a Watchmode ID, or "movie-<tmdb id>": Watchmode accepts TMDB
+    IDs directly, which lets a movie we've already matched skip the search
+    call (half the API usage) and always get the right film.
+    regions=US matches the Worker, so the app and this alert agree.
+    """
     resp = requests.get(
-        f"https://api.watchmode.com/v1/title/{watchmode_id}/sources/",
-        params={"apiKey": WATCHMODE_API_KEY},
+        f"https://api.watchmode.com/v1/title/{title_id}/sources/",
+        params={"apiKey": WATCHMODE_API_KEY, "regions": "US"},
         timeout=20,
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def find_sources(title, year, tmdb_id):
+    """Sources for one movie, or None if Watchmode doesn't know it."""
+    if tmdb_id:
+        try:
+            return get_sources(f"movie-{tmdb_id}")
+        except requests.HTTPError as e:
+            # Watchmode hasn't linked this TMDB ID; fall back to a title search.
+            if e.response is None or e.response.status_code != 404:
+                raise
+    match = search_title(title, year)
+    return get_sources(match["id"]) if match else None
 
 
 def normalize_name(name):
@@ -121,6 +143,8 @@ def send_notification(available_movies):
             "Title": title,
             "Priority": "default",
             "Tags": "clapper",
+            # Tapping the notification opens the app.
+            "Click": APP_URL,
         },
         timeout=20,
     )
@@ -156,11 +180,10 @@ def main():
         key = f"{title}|{year}"
 
         try:
-            match = search_title(title, year)
-            if not match:
+            sources = find_sources(title, year, movie.get("tmdb_id"))
+            if sources is None:
                 print(f"No match found for: {title}")
                 continue
-            sources = get_sources(match["id"])
             services = matching_services(sources, my_services)
         except requests.RequestException as e:
             print(f"Lookup failed for {title}: {e}")

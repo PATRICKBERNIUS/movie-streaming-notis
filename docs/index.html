@@ -49,15 +49,20 @@
       <button id="lock-button" class="quiet" type="button">Lock</button>
     </header>
 
-    <form id="add-form" class="add-form">
-      <input id="add-title" type="text" placeholder="Movie title" aria-label="Movie title"
-             maxlength="200" autocomplete="off" required>
-      <!-- inputmode=numeric shows the number pad on phones; a type=number field
-           would add spinner arrows and accept things like "2e3". -->
-      <input id="add-year" type="text" inputmode="numeric" placeholder="Year"
-             aria-label="Year (optional)" pattern="\d{4}" maxlength="4">
-      <button id="add-button" type="submit">Add</button>
-    </form>
+    <div id="add-area" class="add-area">
+      <form id="add-form" class="add-form">
+        <input id="add-title" type="text" placeholder="Movie title" aria-label="Movie title"
+               maxlength="200" autocomplete="off" required>
+        <!-- inputmode=numeric shows the number pad on phones; a type=number field
+             would add spinner arrows and accept things like "2e3". -->
+        <input id="add-year" type="text" inputmode="numeric" placeholder="Year"
+               aria-label="Year (optional)" pattern="\d{4}" maxlength="4">
+        <button id="add-button" type="submit">Add</button>
+      </form>
+      <!-- TMDB suggestions while you type. Picking one fills in the exact
+           title and year and remembers which film you meant. -->
+      <ul id="suggestions" class="suggestions" aria-label="Suggestions" hidden></ul>
+    </div>
 
     <!-- <details> is a built-in collapsible section: no JavaScript needed to
          open and close it, and it keeps the grid as the first thing you see. -->
@@ -80,8 +85,22 @@
       </datalist>
     </details>
 
-    <div class="toolbar">
+    <!-- One-time (or occasional) review: find the TMDB match for movies that
+         don't have one yet, let you correct or skip each, then save in one go. -->
+    <section id="match-view" class="match" hidden>
+      <h2>Match years</h2>
+      <p class="muted">Check each match. Pick a different film from the list, or
+        "Skip" if none is right. Nothing is saved until you tap Save.</p>
+      <ul id="match-list" class="match-list"></ul>
+      <div class="match-actions">
+        <button id="match-save" type="button">Save matches</button>
+        <button id="match-cancel" class="quiet" type="button">Cancel</button>
+      </div>
+    </section>
+
+    <div id="toolbar" class="toolbar">
       <button id="check-button" type="button">Check availability</button>
+      <button id="match-button" class="secondary" type="button" hidden>Match years</button>
       <label class="sort">
         Sort
         <select id="sort-select">
