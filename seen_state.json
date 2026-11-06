@@ -114,7 +114,9 @@
     "Max"
   ],
   "Letters From Iwo Jima|2006": [],
-  "Scent of a Woman|1992": [],
+  "Scent of a Woman|1992": [
+    "Peacock"
+  ],
   "Escape From New York|1981": [],
   "The King of Comedy|1982": [],
   "The Assassination of Jesse James by the Coward Robert Ford|2007": [],
@@ -132,10 +134,7 @@
   "American Made|2017": [
     "Max"
   ],
-  "The Firm|1993": [
-    "Max",
-    "Peacock"
-  ],
+  "The Firm|1993": [],
   "The Hustler|1961": [],
   "Incendies|2010": [],
   "The Brutalist|2024": [
@@ -201,5 +200,10 @@
     "Max"
   ],
   "Batman Knightfall|2026": [],
-  "Natural Born Killers|1994": []
+  "Natural Born Killers|1994": [],
+  "The Indian Runner|1991": [],
+  "Raising Arizona|1987": [],
+  "The King|2019": [
+    "Netflix"
+  ]
 }
